@@ -1,4 +1,4 @@
-import * as certificatemanager from '@aws-cdk/aws-certificatemanager'
+import * as acm from '@aws-cdk/aws-certificatemanager'
 import * as cloudfront from '@aws-cdk/aws-cloudfront'
 import * as route53 from '@aws-cdk/aws-route53'
 import * as route53targets from '@aws-cdk/aws-route53-targets'
@@ -11,7 +11,7 @@ export interface DomainWebRedirectProps {
     domainName: string
     hostedZone: route53.IHostedZone
   }[]
-  certificate: certificatemanager.ICertificate
+  certificate: acm.ICertificate
   targetDomain: string
 }
 

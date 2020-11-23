@@ -7,6 +7,11 @@ web requests for one or more `source` domains to a `target` domain. This could b
 to redirect from the `www` domain (e.g. `www.example.com`) to the APEX / naked domain
 (e.g. `example.com`) or vice versa.
 
+In addition to the `source` and `target` domain names you must also provide:
+
+- the `IHostedZone` of each `source` domain
+- one `ICertificate` that is valid for all `source` domains
+
 Note that this uses 301 permanent redirects which browsers cache without an expiration
 date. This means that if you set this up and later modify the `target` domain you
 should also configure the old `target` domain to redirect to the new `target` domain.
