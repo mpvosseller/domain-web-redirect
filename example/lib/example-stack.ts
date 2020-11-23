@@ -1,41 +1,27 @@
-import * as cloudfront from '@aws-cdk/aws-cloudfront'
-import * as s3 from '@aws-cdk/aws-s3'
+import * as acm from '@aws-cdk/aws-certificatemanager'
+import * as route53 from '@aws-cdk/aws-route53'
 import * as cdk from '@aws-cdk/core'
-import { RemovalPolicy } from '@aws-cdk/core'
-import { CloudFrontInvalidator } from 'cdk-cloudfront-invalidator'
+import { DomainWebRedirect } from 'domain-web-redirect'
 
 export class ExampleStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props)
 
-    const bucket = new s3.Bucket(this, 'Bucket', {
-      websiteRedirect: {
-        protocol: s3.RedirectProtocol.HTTPS,
-        hostName: 'example.com',
-      },
-      removalPolicy: RemovalPolicy.DESTROY,
-    })
-
-    const webDistribution = new cloudfront.CloudFrontWebDistribution(this, 'WebDistribution', {
-      defaultRootObject: '',
-      originConfigs: [
+    new DomainWebRedirect(this, 'DomainWebRedirect', {
+      sourceDomains: [
         {
-          customOriginSource: {
-            domainName: bucket.bucketWebsiteDomainName,
-            originProtocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
-          },
-          behaviors: [
-            {
-              isDefaultBehavior: true,
-            },
-          ],
+          domainName: 'sandbox.mikevosseller.com',
+          hostedZone: route53.HostedZone.fromLookup(this, `HostedZone`, {
+            domainName: 'sandbox.mikevosseller.com',
+          }),
         },
       ],
-    })
-
-    new CloudFrontInvalidator(this, 'CloudFrontInvalidator', {
-      distributionId: webDistribution.distributionId,
-      hash: '12345',
+      certificate: acm.Certificate.fromCertificateArn(
+        this,
+        'Certificate',
+        'arn:aws:acm:us-east-1:855277382201:certificate/e8c5f7e0-4cd9-426a-9a7d-c17f54302bcd'
+      ),
+      targetDomain: 'www.google.com',
     })
   }
 }

@@ -1,43 +1,72 @@
-import * as iam from '@aws-cdk/aws-iam'
-import * as lambda from '@aws-cdk/aws-lambda'
-import { Construct, CustomResource, Duration } from '@aws-cdk/core'
-import path from 'path'
+import * as certificatemanager from '@aws-cdk/aws-certificatemanager'
+import * as cloudfront from '@aws-cdk/aws-cloudfront'
+import * as route53 from '@aws-cdk/aws-route53'
+import * as route53targets from '@aws-cdk/aws-route53-targets'
+import * as s3 from '@aws-cdk/aws-s3'
+import { Construct, RemovalPolicy } from '@aws-cdk/core'
+import { CloudFrontInvalidator } from 'cdk-cloudfront-invalidator'
 
-export interface CloudFrontInvalidatorProps {
-  distributionId: string
-  hash: string
+export interface DomainWebRedirectProps {
+  sourceDomains: {
+    domainName: string
+    hostedZone: route53.IHostedZone
+  }[]
+  certificate: certificatemanager.ICertificate
+  targetDomain: string
 }
 
 /**
- * Invalidates the cache of a CloudFront distribution any time hash changes
+ * Redirect all http / https requests from one or more source domains to a target domain
  */
-export class CloudFrontInvalidator extends Construct {
-  constructor(scope: Construct, id: string, props: CloudFrontInvalidatorProps) {
+export class DomainWebRedirect extends Construct {
+  public readonly webDistribution: cloudfront.CloudFrontWebDistribution
+
+  constructor(scope: Construct, id: string, props: DomainWebRedirectProps) {
     super(scope, id)
 
-    const lambdaFn = new lambda.SingletonFunction(this, 'Function', {
-      uuid: 'B8817A1B-81A9-4B03-90A7-A0618D090BF3',
-      runtime: lambda.Runtime.NODEJS_12_X,
-      code: lambda.Code.fromAsset(path.join(__dirname, '../lambda')),
-      handler: 'index.handler',
-      lambdaPurpose: 'CloudFrontInvalidator',
-      initialPolicy: [
-        new iam.PolicyStatement({
-          effect: iam.Effect.ALLOW,
-          actions: ['cloudfront:GetInvalidation', 'cloudfront:CreateInvalidation'],
-          resources: ['*'],
-        }),
-      ],
-      timeout: Duration.minutes(15),
+    const bucket = new s3.Bucket(this, 'Bucket', {
+      websiteRedirect: {
+        protocol: s3.RedirectProtocol.HTTPS,
+        hostName: props.targetDomain,
+      },
+      removalPolicy: RemovalPolicy.DESTROY,
     })
 
-    new CustomResource(this, 'CustomResource', {
-      serviceToken: lambdaFn.functionArn,
-      resourceType: 'Custom::CloudFrontInvalidator',
-      properties: {
-        distributionId: props.distributionId,
-        hash: `${props.hash}-${lambdaFn.currentVersion.version}`,
-      },
+    this.webDistribution = new cloudfront.CloudFrontWebDistribution(this, 'WebDistribution', {
+      comment: `redirect to ${props.targetDomain}`,
+      defaultRootObject: '', // prevent redirecting https://source to https://target/index.html
+      originConfigs: [
+        {
+          customOriginSource: {
+            domainName: bucket.bucketWebsiteDomainName,
+            originProtocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
+          },
+          behaviors: [
+            {
+              isDefaultBehavior: true,
+            },
+          ],
+        },
+      ],
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.ALLOW_ALL, // don't bother having CloudFront redirect http://source to https://source. S3 will handle redirecting directly to https://target
+      viewerCertificate: cloudfront.ViewerCertificate.fromAcmCertificate(props.certificate, {
+        aliases: props.sourceDomains.map((s) => s.domainName),
+      }),
     })
+
+    new CloudFrontInvalidator(this, 'CloudFrontInvalidator', {
+      distributionId: this.webDistribution.distributionId,
+      hash: props.targetDomain, // invalidate CloudFront cache if the targetDomain ever changes
+    })
+
+    for (const source of props.sourceDomains) {
+      new route53.ARecord(this, `ARecord-${source.domainName}`, {
+        recordName: source.domainName,
+        zone: source.hostedZone,
+        target: route53.RecordTarget.fromAlias(
+          new route53targets.CloudFrontTarget(this.webDistribution)
+        ),
+      })
+    }
   }
 }
