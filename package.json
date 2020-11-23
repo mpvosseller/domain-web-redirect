@@ -1,7 +1,7 @@
 {
   "name": "domain-web-redirect",
   "license": "ISC",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "main": "dist/lib/index.js",
   "types": "dist/lib/index.d.ts",
   "keywords": [
