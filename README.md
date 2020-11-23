@@ -1,16 +1,15 @@
 # domain-web-redirect
 
 An AWS CDK construct that redirects all http/https requests for one domain to another.
-This could be used to redirect from the `www` domain (e.g. `www.example.com`) to the
-APEX / naked domain (e.g. `example.com`) or vice versa.
 
 `DomainWebRedirect` is an [AWS CDK](https://aws.amazon.com/cdk) construct that redirects
-web requests for one or more `source` domains to a `target` domain. You must provide a
-reference to a certificate that works for all of the `source` domains.
+web requests for one or more `source` domains to a `target` domain. This could be used
+to redirect from the `www` domain (e.g. `www.example.com`) to the APEX / naked domain
+(e.g. `example.com`) or vice versa.
 
 Note that this uses 301 permanent redirects which browsers cache without an expiration
-date. This means that if you want to change where you redirect to you should configure
-the old `target` domain to redirect to the new `target` domain.
+date. This means that if you set this up and later modify the `target` domain you
+should also configure the old `target` domain to redirect to the new `target` domain.
 
 ## Installation
 
